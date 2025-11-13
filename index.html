@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>엑셀 헤더열(#{강의명}/#{강좌명}) 3행 → C/H/M/R 업로드</title>
+  <title>엑셀 헤더열(#{강의명}/#{강좌명}) → C/H/M/R 업로드</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Google Identity Services (OAuth) -->
@@ -75,11 +75,11 @@
   <div class="app">
     <header>
       <div>
-        <h1>엑셀 헤더 3행 → C/H/M/R 업로드</h1>
+        <h1>엑셀 헤더 → C/H/M/R 업로드</h1>
         <div class="sub">
           각 .xlsx 파일의 <strong>첫 시트</strong>에서<br/>
-          1행 헤더가 <code>#{강의명}</code> 또는 <code>#{강좌명}</code>인 열을 찾고,<br/>
-          그 열의 <strong>3행 값</strong>을 읽어<br/>
+          아무 행이든 상관없이, 셀 값이 <code>#{강의명}</code> 또는 <code>#{강좌명}</code>인 헤더를 찾고,<br/>
+          그 <strong>헤더 바로 아래 행</strong>의 같은 열 값을 읽어<br/>
           연결된 구글 시트 <strong>C / H / M / R 열</strong>(헤더 제외, 2행부터)에 순서대로 채웁니다.
         </div>
       </div>
@@ -100,7 +100,7 @@
     <!-- C열 업로드 -->
     <section class="panel">
       <h2>C열 업로드</h2>
-      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 C열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 바로 아래 행 값 → 시트 C열</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
         <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
@@ -111,7 +111,7 @@
     <!-- H열 업로드 -->
     <section class="panel">
       <h2>H열 업로드</h2>
-      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 H열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 바로 아래 행 값 → 시트 H열</small>
       <div class="row">
         <input type="file" id="file-h" multiple accept=".xlsx" />
         <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
@@ -122,7 +122,7 @@
     <!-- M열 업로드 -->
     <section class="panel">
       <h2>M열 업로드</h2>
-      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 M열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 바로 아래 행 값 → 시트 M열</small>
       <div class="row">
         <input type="file" id="file-m" multiple accept=".xlsx" />
         <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
@@ -133,7 +133,7 @@
     <!-- R열 업로드 -->
     <section class="panel">
       <h2>R열 업로드</h2>
-      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 R열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 바로 아래 행 값 → 시트 R열</small>
       <div class="row">
         <input type="file" id="file-r" multiple accept=".xlsx" />
         <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
@@ -156,7 +156,7 @@
       R: 'R',
     };
 
-    // 엑셀 헤더에서 찾을 후보 (정확히 이 문자열이어야 함)
+    // 엑셀 헤더에서 정확히 이 문자열을 찾음
     const HEADER_CANDIDATES = ['#{강의명}', '#{강좌명}'];
 
     // =============================
@@ -224,11 +224,15 @@
       setAuthUI(false);
     });
 
-    // ========= 2. 엑셀에서 헤더열 3행 값 읽기 =========
+    // ========= 2. 엑셀에서 "헤더 바로 아래 행" 값 읽기 =========
     /**
-     * 결과: { value, headerText, columnIndex } 또는 { error }
+     * 엑셀 전체를 훑어서:
+     * - 셀 값이 #{강의명} / #{강좌명}인 위치를 찾고
+     * - 그 바로 아래 행의 같은 열 값을 반환
+     *
+     * 결과: { value, headerText, columnIndex, headerRowIndex } 또는 { error }
      */
-    async function readHeaderRow3FromFile(file) {
+    async function readHeaderBelowRowFromFile(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onerror = () => resolve({ error: '파일 읽기 실패' });
@@ -249,40 +253,45 @@
             if (!rows.length) {
               return resolve({ error: '시트에 데이터가 없습니다.' });
             }
-            if (rows.length < 3) {
-              return resolve({ error: '3행이 존재하지 않습니다.' });
-            }
 
-            const headerRow = rows[0];  // 1행
-            const dataRow   = rows[2];  // 3행 (0-based index 2)
-
+            let headerRowIndex = -1;
             let targetIndex = -1;
-            let headerText  = '';
+            let headerText = '';
 
-            for (let j = 0; j < headerRow.length; j++) {
-              const raw = headerRow[j];
-              if (raw === undefined || raw === null) continue;
+            // ★ 모든 행/열을 돌면서 헤더 후보를 찾는다
+            outer: for (let i = 0; i < rows.length; i++) {
+              const row = rows[i] || [];
+              for (let j = 0; j < row.length; j++) {
+                const raw = row[j];
+                if (raw === undefined || raw === null) continue;
 
-              const cellText = String(raw).trim(); // 앞뒤 공백 제거
-
-              // #{강의명}, #{강좌명} 정확 매칭
-              if (HEADER_CANDIDATES.includes(cellText)) {
-                targetIndex = j;
-                headerText = cellText;
-                break;
+                const cellText = String(raw).trim();
+                if (HEADER_CANDIDATES.includes(cellText)) {
+                  headerRowIndex = i;
+                  targetIndex = j;
+                  headerText = cellText;
+                  break outer;
+                }
               }
             }
 
-            if (targetIndex === -1) {
+            if (headerRowIndex === -1) {
               return resolve({ error: '헤더 #{강의명}/#{강좌명}를 찾지 못했습니다.' });
             }
 
+            const dataRowIndex = headerRowIndex + 1;
+            if (dataRowIndex >= rows.length) {
+              return resolve({ error: '헤더 바로 아래 행(데이터 행)이 없습니다.' });
+            }
+
+            const dataRow = rows[dataRowIndex] || [];
             const value = dataRow[targetIndex] !== undefined ? String(dataRow[targetIndex]) : '';
 
             resolve({
               value,
               headerText,
               columnIndex: targetIndex,
+              headerRowIndex,
             });
           } catch (err) {
             resolve({ error: '엑셀 파싱 실패: ' + err.message });
@@ -309,7 +318,7 @@
       }
 
       statusEl.className = 'status info';
-      statusEl.textContent = `총 ${files.length}개 파일 분석 중...\n(헤더열 3행 값 미리보기)`;
+      statusEl.textContent = `총 ${files.length}개 파일 분석 중...\n(헤더 바로 아래 행 값 미리보기)`;
 
       const values = [];
       let successCount = 0;
@@ -318,7 +327,7 @@
       const debugLines = [];
 
       for (const file of files) {
-        const result = await readHeaderRow3FromFile(file);
+        const result = await readHeaderBelowRowFromFile(file);
 
         if (result.error) {
           failCount++;
@@ -326,18 +335,19 @@
           continue;
         }
 
-        const { value, headerText, columnIndex } = result;
+        const { value, headerText, columnIndex, headerRowIndex } = result;
         const colLetter = indexToColumnLetter(columnIndex);
+        const dataRowNumber = headerRowIndex + 2; // 엑셀 기준 1행부터 시작이므로 +1, 거기서 또 +1
 
         if (value === '') {
           emptyCount++;
           debugLines.push(
-            `△ ${file.name} → 헤더 "${headerText}" (${colLetter}열)의 3행 값이 비어 있습니다.`
+            `△ ${file.name} → 헤더 "${headerText}" (${colLetter}${headerRowIndex+1}) 바로 아래 셀 ${colLetter}${dataRowNumber} 값이 비어 있습니다.`
           );
         } else {
           successCount++;
           debugLines.push(
-            `○ ${file.name} → 헤더 "${headerText}" (${colLetter}열) 3행 값: "${value}"`
+            `○ ${file.name} → 헤더 "${headerText}" (${colLetter}${headerRowIndex+1}) 아래 ${colLetter}${dataRowNumber}: "${value}"`
           );
         }
 
@@ -347,7 +357,7 @@
       statusEl.textContent =
         `분석 결과 (미리보기):\n` +
         debugLines.join('\n') +
-        `\n\n읽어온 파일: ${files.length}개 (성공 ${successCount}, 3행 공백 ${emptyCount}, 실패 ${failCount})`;
+        `\n\n읽어온 파일: ${files.length}개 (성공 ${successCount}, 공백 ${emptyCount}, 실패 ${failCount})`;
 
       if (!values.length) {
         statusEl.className = 'status err';
@@ -358,7 +368,7 @@
       const allEmpty = values.every(row => row[0] === '');
       if (allEmpty) {
         statusEl.className = 'status err';
-        statusEl.textContent += '\n\n→ 모든 파일에서 3행 값이 공백이라 시트에는 쓰지 않았습니다.';
+        statusEl.textContent += '\n\n→ 모든 파일에서 값이 공백이라 시트에는 쓰지 않았습니다.';
         return;
       }
 
@@ -403,7 +413,7 @@
         statusEl.className = 'status ok';
         statusEl.textContent +=
           `\n\n실제 쓰여진 범위: ${updateRange}\n` +
-          `→ ${colKey}열 업로드 완료 (성공 ${successCount}, 3행 공백 ${emptyCount}, 실패 ${failCount})`;
+          `→ ${colKey}열 업로드 완료 (성공 ${successCount}, 공백 ${emptyCount}, 실패 ${failCount})`;
 
         selectedFiles[colKey] = [];
       } catch (err) {

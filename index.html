@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>엑셀 헤더 열(강의명/강좌명) 3행 → C/H/M/R 업로드</title>
+  <title>엑셀 헤더열(강의명/강좌명) 3행 → C/H/M/R 업로드</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Google Identity Services (OAuth) -->
@@ -53,6 +53,7 @@
     input[type="file"]{font-size:.85rem}
     .status{
       font-size:.8rem;margin-top:6px;min-height:1.1em;
+      white-space:pre-line;
     }
     .status.ok{color:var(--ok)}
     .status.err{color:var(--danger)}
@@ -74,12 +75,12 @@
   <div class="app">
     <header>
       <div>
-        <h1>엑셀 헤더(강의명/강좌명) 3행 → C/H/M/R 업로드</h1>
+        <h1>엑셀 헤더 3행 → C/H/M/R 업로드</h1>
         <div class="sub">
-          업로드한 .xlsx의 <strong>첫 번째 시트</strong>에서<br/>
-          1행 헤더 중 <strong>"강의명" 또는 "강좌명"</strong>이 들어있는 열을 찾고,<br/>
-          그 <strong>같은 열의 3행 값</strong>을 읽어서<br/>
-          연결된 구글 시트의 <strong>C / H / M / R 열</strong>(헤더 제외)에 순서대로 채웁니다.
+          각 .xlsx 파일의 <strong>첫 시트</strong>에서<br/>
+          1행 헤더 중 <strong>"강의명" / "강좌명"</strong>이 들어있는 열을 찾고,<br/>
+          그 열의 <strong>3행 값</strong>을 읽어서<br/>
+          연결된 구글 시트의 <strong>C / H / M / R 열</strong>(헤더 제외, 2행부터)에 순서대로 채웁니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -99,7 +100,7 @@
     <!-- C열 업로드 -->
     <section class="panel">
       <h2>C열 업로드</h2>
-      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 C열 (2행부터 순차 입력)</small>
+      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 C열</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
         <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
@@ -110,7 +111,7 @@
     <!-- H열 업로드 -->
     <section class="panel">
       <h2>H열 업로드</h2>
-      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 H열</small>
+      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 H열</small>
       <div class="row">
         <input type="file" id="file-h" multiple accept=".xlsx" />
         <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
@@ -121,7 +122,7 @@
     <!-- M열 업로드 -->
     <section class="panel">
       <h2>M열 업로드</h2>
-      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 M열</small>
+      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 M열</small>
       <div class="row">
         <input type="file" id="file-m" multiple accept=".xlsx" />
         <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
@@ -132,7 +133,7 @@
     <!-- R열 업로드 -->
     <section class="panel">
       <h2>R열 업로드</h2>
-      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 R열</small>
+      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 R열</small>
       <div class="row">
         <input type="file" id="file-r" multiple accept=".xlsx" />
         <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
@@ -142,13 +143,12 @@
   </div>
 
   <script>
-    // ============ 1. 설정값 ============
-
+    // ========= 1. 설정값 =========
     const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
     const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
     const SHEET_NAME = '시트1';                                          // TODO
 
-    // 업로드 구역 키(C/H/M/R) → 실제 시트 열 문자
+    // 업로드 구역 → 실제 시트 열
     const TARGET_COLUMNS = {
       C: 'C',
       H: 'H',
@@ -156,15 +156,13 @@
       R: 'R',
     };
 
-    // 엑셀 헤더에서 찾을 후보 문자열들
+    // 엑셀 헤더에서 찾을 후보 문자열들 (포함이면 인식)
     const HEADER_CANDIDATES = ['강의명', '강좌명'];
 
-    // ===================================
-
+    // =============================
     let tokenClient = null;
     let accessToken = null;
 
-    // 열별로 선택된 파일 누적
     const selectedFiles = { C: [], H: [], M: [], R: [] };
 
     function setAuthUI(authed) {
@@ -184,7 +182,7 @@
     }
 
     window.addEventListener('load', () => {
-      // OAuth 토큰 클라이언트 초기화
+      // OAuth 초기화
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/spreadsheets',
@@ -198,10 +196,9 @@
         tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
       });
 
-      // 파일 선택 시 열별 파일 누적
+      // 파일 선택 핸들러
       ['C','H','M','R'].forEach(colKey => {
-        const lower = colKey.toLowerCase();
-        const input = document.getElementById('file-' + lower);
+        const input = document.getElementById('file-' + colKey.toLowerCase());
         const statusEl = document.getElementById('status-' + colKey);
 
         input.addEventListener('change', (e) => {
@@ -209,7 +206,6 @@
           if (!files.length) return;
 
           const store = selectedFiles[colKey];
-
           files.forEach(f => {
             const exists = store.some(
               x => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified
@@ -219,9 +215,8 @@
 
           statusEl.className = 'status info';
           statusEl.textContent =
-            `현재 선택된 파일 ${store.length}개: ` + store.map(f => f.name).join(', ');
+            `현재 선택된 파일 ${store.length}개:\n` + store.map(f => '- ' + f.name).join('\n');
 
-          // 같은 파일 다시 선택 가능하게 초기화
           input.value = '';
         });
       });
@@ -229,17 +224,15 @@
       setAuthUI(false);
     });
 
-    // ============ 2. 엑셀에서 값 읽기 (헤더 인식) ============
-
+    // ========= 2. 엑셀에서 헤더열 3행 값 읽기 =========
     /**
-     * 엑셀 첫 시트에서:
-     *  - 1행 헤더에서 HEADER_CANDIDATES 중 하나가 포함된 열을 찾고
-     *  - 그 열의 3행 값을 반환
+     * 결과: { value, headerText, columnIndex } 또는 { error }
      */
-    function readHeaderRow3FromFile(file) {
-      return new Promise((resolve, reject) => {
+    async function readHeaderRow3FromFile(file) {
+      return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onerror = () => reject(new Error('파일 읽기 실패: ' + file.name));
+        reader.onerror = () => resolve({ error: '파일 읽기 실패' });
+
         reader.onload = (e) => {
           try {
             const data = new Uint8Array(e.target.result);
@@ -247,60 +240,63 @@
             const firstSheetName = wb.SheetNames[0];
             const sheet = wb.Sheets[firstSheetName];
 
-            // 2D 배열로 변환 (행/열 인덱스 기반 접근)
             const rows = XLSX.utils.sheet_to_json(sheet, {
               header: 1,
               defval: '',
-              blankrows: true
+              blankrows: true,
             });
 
+            if (!rows.length) {
+              return resolve({ error: '시트에 데이터가 없습니다.' });
+            }
             if (rows.length < 3) {
-              // 3행이 없음
-              resolve('');
-              return;
+              return resolve({ error: '3행이 존재하지 않습니다.' });
             }
 
             const headerRow = rows[0];  // 1행
             const dataRow   = rows[2];  // 3행 (0-based index 2)
 
             let targetIndex = -1;
+            let headerText  = '';
+
             for (let j = 0; j < headerRow.length; j++) {
-              const headerText = String(headerRow[j] || '');
-              if (HEADER_CANDIDATES.some(h => headerText.includes(h))) {
+              const cellText = String(headerRow[j] || '');
+              if (!cellText) continue;
+              if (HEADER_CANDIDATES.some(h => cellText.includes(h))) {
                 targetIndex = j;
+                headerText = cellText;
                 break;
               }
             }
 
             if (targetIndex === -1) {
-              // 헤더를 못 찾으면 빈 값으로 처리
-              resolve('');
-              return;
+              return resolve({ error: '강의명/강좌명 헤더를 찾지 못했습니다.' });
             }
 
             const value = dataRow[targetIndex] !== undefined ? String(dataRow[targetIndex]) : '';
-            resolve(value);
+
+            resolve({
+              value,
+              headerText,
+              columnIndex: targetIndex,
+            });
           } catch (err) {
-            reject(new Error('엑셀 파싱 실패: ' + file.name + ' · ' + err.message));
+            resolve({ error: '엑셀 파싱 실패: ' + err.message });
           }
         };
+
         reader.readAsArrayBuffer(file);
       });
     }
 
-    // ============ 3. 특정 시트 열(C/H/M/R)에 값 쓰기 ============
-
+    // ========= 3. C/H/M/R 열로 업로드 =========
     async function uploadColumn(colKey) {
       const statusEl = document.getElementById('status-' + colKey);
       const files = selectedFiles[colKey] || [];
       const physicalCol = TARGET_COLUMNS[colKey];
 
       if (!accessToken) {
-        alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
-        return;
-      }
-      if (!physicalCol) {
-        alert(colKey + '열 매핑이 잘못되었습니다. 코드의 TARGET_COLUMNS를 확인해주세요.');
+        alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인해주세요.');
         return;
       }
       if (!files.length) {
@@ -309,31 +305,64 @@
       }
 
       statusEl.className = 'status info';
-      statusEl.textContent = `총 ${files.length}개 파일에서 헤더열(강의명/강좌명)의 3행 값을 읽는 중...`;
+      statusEl.textContent = `총 ${files.length}개 파일 분석 중...\n(헤더열 3행 값 미리보기)`;
 
       const values = [];
-      let successCount = 0, emptyCount = 0, failCount = 0;
+      let successCount = 0;
+      let emptyCount = 0;
+      let failCount = 0;
+      const debugLines = [];
 
       for (const file of files) {
-        try {
-          const v = await readHeaderRow3FromFile(file);
-          if (v === '') emptyCount++;
-          values.push([v]);  // 한 행에 한 값
-          successCount++;
-        } catch (err) {
-          console.error(err);
+        const result = await readHeaderRow3FromFile(file);
+
+        if (result.error) {
           failCount++;
+          debugLines.push(`✖ ${file.name} → 오류: ${result.error}`);
+          continue;
         }
+
+        const { value, headerText, columnIndex } = result;
+        const colLetter = indexToColumnLetter(columnIndex);
+
+        if (value === '') {
+          emptyCount++;
+          debugLines.push(
+            `△ ${file.name} → 헤더 "${headerText}" (${colLetter}열)의 3행 값이 비어 있습니다.`
+          );
+        } else {
+          successCount++;
+          debugLines.push(
+            `○ ${file.name} → 헤더 "${headerText}" (${colLetter}열) 3행 값: "${value}"`
+          );
+        }
+
+        // 공백이어도 values에 넣어서 줄 수 맞춰줌 (필요 없으면 여기서 걸러도 됨)
+        values.push([value]);
       }
+
+      // 디버그 미리 보여주기
+      statusEl.textContent =
+        `분석 결과 (미리보기):\n` +
+        debugLines.join('\n') +
+        `\n\n읽어온 파일: ${files.length}개 (성공 ${successCount}, 3행 공백 ${emptyCount}, 실패 ${failCount})`;
 
       if (!values.length) {
         statusEl.className = 'status err';
-        statusEl.textContent = '읽어 온 값이 없습니다.';
+        statusEl.textContent += '\n\n→ 읽어 온 값이 하나도 없어 시트에는 아무 것도 쓰지 않았습니다.';
+        return;
+      }
+
+      // 모든 값이 공백이면 굳이 시트에 쓰지 않음
+      const allEmpty = values.every(row => row[0] === '');
+      if (allEmpty) {
+        statusEl.className = 'status err';
+        statusEl.textContent += '\n\n→ 모든 파일에서 3행 값이 공백이라 시트에는 쓰지 않았습니다.';
         return;
       }
 
       try {
-        // 이 열에서 "헤더 제외(2행부터)" 이미 채워진 행 수 확인
+        // 이 열에서 헤더 제외(2행부터) 이미 몇 개 있는지 확인
         const colRange = `${SHEET_NAME}!${physicalCol}2:${physicalCol}`;
         const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(colRange)}`;
 
@@ -351,7 +380,6 @@
           console.warn('열 값 읽기 오류:', text);
         }
 
-        // 이미 existingCount개 있으니, 2 + existingCount 행부터 새로 채움
         const startRow = 2 + existingCount;
         const endRow   = startRow + values.length - 1;
         const updateRange = `${SHEET_NAME}!${physicalCol}${startRow}:${physicalCol}${endRow}`;
@@ -372,16 +400,27 @@
         }
 
         statusEl.className = 'status ok';
-        statusEl.textContent =
-          `${colKey}열 업로드 완료 · 성공 ${successCount}개, `
-          + `헤더열 3행 공백 ${emptyCount}개, 실패 ${failCount}개`;
+        statusEl.textContent +=
+          `\n\n실제 쓰여진 범위: ${updateRange}\n` +
+          `→ ${colKey}열 업로드 완료 (성공 ${successCount}, 3행 공백 ${emptyCount}, 실패 ${failCount})`;
 
-        selectedFiles[colKey] = []; // 해당 열 파일 목록 초기화
+        selectedFiles[colKey] = [];
       } catch (err) {
         console.error(err);
         statusEl.className = 'status err';
-        statusEl.textContent = '업로드 중 오류: ' + err.message;
+        statusEl.textContent += '\n\n시트 업로드 중 오류: ' + err.message;
       }
+    }
+
+    // 0-based index → 열 문자(A/B/C...)
+    function indexToColumnLetter(index) {
+      let result = '';
+      let n = index;
+      while (n >= 0) {
+        result = String.fromCharCode((n % 26) + 65) + result;
+        n = Math.floor(n / 26) - 1;
+      }
+      return result;
     }
   </script>
 </body>

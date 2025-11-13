@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>엑셀 헤더열(강의명/강좌명) 3행 → C/H/M/R 업로드</title>
+  <title>엑셀 헤더열(#{강의명}/#{강좌명}) 3행 → C/H/M/R 업로드</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Google Identity Services (OAuth) -->
@@ -78,9 +78,9 @@
         <h1>엑셀 헤더 3행 → C/H/M/R 업로드</h1>
         <div class="sub">
           각 .xlsx 파일의 <strong>첫 시트</strong>에서<br/>
-          1행 헤더 중 <strong>"강의명" / "강좌명"</strong>이 들어있는 열을 찾고,<br/>
-          그 열의 <strong>3행 값</strong>을 읽어서<br/>
-          연결된 구글 시트의 <strong>C / H / M / R 열</strong>(헤더 제외, 2행부터)에 순서대로 채웁니다.
+          1행 헤더가 <code>#{강의명}</code> 또는 <code>#{강좌명}</code>인 열을 찾고,<br/>
+          그 열의 <strong>3행 값</strong>을 읽어<br/>
+          연결된 구글 시트 <strong>C / H / M / R 열</strong>(헤더 제외, 2행부터)에 순서대로 채웁니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -100,7 +100,7 @@
     <!-- C열 업로드 -->
     <section class="panel">
       <h2>C열 업로드</h2>
-      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 C열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 C열</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
         <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
@@ -111,7 +111,7 @@
     <!-- H열 업로드 -->
     <section class="panel">
       <h2>H열 업로드</h2>
-      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 H열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 H열</small>
       <div class="row">
         <input type="file" id="file-h" multiple accept=".xlsx" />
         <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
@@ -122,7 +122,7 @@
     <!-- M열 업로드 -->
     <section class="panel">
       <h2>M열 업로드</h2>
-      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 M열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 M열</small>
       <div class="row">
         <input type="file" id="file-m" multiple accept=".xlsx" />
         <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
@@ -133,7 +133,7 @@
     <!-- R열 업로드 -->
     <section class="panel">
       <h2>R열 업로드</h2>
-      <small>엑셀 헤더(강의명/강좌명) 열의 3행 값 → 시트 R열</small>
+      <small>엑셀 헤더(#{강의명}/#{강좌명}) 열의 3행 값 → 시트 R열</small>
       <div class="row">
         <input type="file" id="file-r" multiple accept=".xlsx" />
         <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
@@ -156,8 +156,8 @@
       R: 'R',
     };
 
-    // 엑셀 헤더에서 찾을 후보 문자열들 (포함이면 인식)
-    const HEADER_CANDIDATES = ['강의명', '강좌명'];
+    // 엑셀 헤더에서 찾을 후보 (정확히 이 문자열이어야 함)
+    const HEADER_CANDIDATES = ['#{강의명}', '#{강좌명}'];
 
     // =============================
     let tokenClient = null;
@@ -260,9 +260,13 @@
             let headerText  = '';
 
             for (let j = 0; j < headerRow.length; j++) {
-              const cellText = String(headerRow[j] || '');
-              if (!cellText) continue;
-              if (HEADER_CANDIDATES.some(h => cellText.includes(h))) {
+              const raw = headerRow[j];
+              if (raw === undefined || raw === null) continue;
+
+              const cellText = String(raw).trim(); // 앞뒤 공백 제거
+
+              // #{강의명}, #{강좌명} 정확 매칭
+              if (HEADER_CANDIDATES.includes(cellText)) {
                 targetIndex = j;
                 headerText = cellText;
                 break;
@@ -270,7 +274,7 @@
             }
 
             if (targetIndex === -1) {
-              return resolve({ error: '강의명/강좌명 헤더를 찾지 못했습니다.' });
+              return resolve({ error: '헤더 #{강의명}/#{강좌명}를 찾지 못했습니다.' });
             }
 
             const value = dataRow[targetIndex] !== undefined ? String(dataRow[targetIndex]) : '';
@@ -337,11 +341,9 @@
           );
         }
 
-        // 공백이어도 values에 넣어서 줄 수 맞춰줌 (필요 없으면 여기서 걸러도 됨)
-        values.push([value]);
+        values.push([value]); // 공백이어도 줄 수는 맞춰서 넣음
       }
 
-      // 디버그 미리 보여주기
       statusEl.textContent =
         `분석 결과 (미리보기):\n` +
         debugLines.join('\n') +
@@ -353,7 +355,6 @@
         return;
       }
 
-      // 모든 값이 공백이면 굳이 시트에 쓰지 않음
       const allEmpty = values.every(row => row[0] === '');
       if (allEmpty) {
         statusEl.className = 'status err';

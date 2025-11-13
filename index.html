@@ -24,7 +24,7 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       background: var(--bg);
       color: #0f172a;
     }
@@ -117,13 +117,8 @@
       margin-top: 4px;
     }
     @media (max-width: 600px) {
-      header {
-        align-items: flex-start;
-      }
-      .row {
-        flex-direction: column;
-        align-items: flex-start;
-      }
+      header { align-items: flex-start; }
+      .row { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -135,7 +130,7 @@
         <div class="sub">
           각 엑셀 파일의 <strong>D3</strong> 셀 값을 읽어서, 지정한 열(C/H/M/R)의
           <strong>2행부터</strong> 아래로 차례대로 추가합니다.<br/>
-          👉 같은 열에 파일을 여러 번 골라도 누적됩니다.
+          👉 다른 열/행은 건드리지 않고, 해당 열 셀만 채웁니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -153,7 +148,7 @@
     <!-- C 열 업로드 -->
     <section class="panel">
       <h2>C열에 넣을 파일(.xlsx)</h2>
-      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 C열 (헤더 1행 제외, 2행부터 추가)</small>
+      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 C열 (헤더 1행 제외, 2행부터)</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
         <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
@@ -199,19 +194,22 @@
     // === 1. 설정값 (여기만 본인 걸로 교체) ==========================
     const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
     const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
-    const SHEET_NAME = '시트1';                                           // TODO: 값 넣을 시트 이름
+    const SHEET_NAME = '시트1';                                          // TODO
+
+    // 버튼(C/H/M/R) → 실제 시트 열 문자 매핑
+    const TARGET_COLUMNS = {
+      C: 'C',
+      H: 'H',
+      M: 'M',
+      R: 'R',
+    };
 
     // ===============================================================
     let tokenClient;
     let accessToken = null;
 
     // 열별로 선택된 파일 누적 저장용
-    const selectedFiles = {
-      C: [],
-      H: [],
-      M: [],
-      R: [],
-    };
+    const selectedFiles = { C: [], H: [], M: [], R: [] };
 
     function setAuthUI(authed) {
       const authBtn = document.getElementById('auth-btn');
@@ -244,7 +242,7 @@
         tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
       });
 
-      // 파일 선택 시, 열별로 파일 누적 저장
+      // 파일 선택 시 열별 파일 누적
       ['C','H','M','R'].forEach(col => {
         const lower = col.toLowerCase();
         const input = document.getElementById('file-' + lower);
@@ -256,7 +254,6 @@
 
           const store = selectedFiles[col];
 
-          // 중복(이름+사이즈+수정시각) 파일은 한 번만
           files.forEach(f => {
             const exists = store.some(
               x => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified
@@ -268,7 +265,7 @@
           statusEl.textContent =
             `현재 선택된 파일 ${store.length}개: ` + store.map(f => f.name).join(', ');
 
-          // 같은 파일을 다시 선택할 수 있게 input 비워주기
+          // 같은 파일 다시 선택 가능하게 초기화
           input.value = '';
         });
       });
@@ -298,10 +295,11 @@
       });
     }
 
-    // === 3. 특정 열(C/H/M/R)에 업로드 ================================
+    // === 3. 특정 열(C/H/M/R)에 업로드 (행 밀림 없음) ==================
     async function uploadColumn(colLetter) {
       const statusEl = document.getElementById('status-' + colLetter);
       const files = selectedFiles[colLetter] || [];
+      const physicalCol = TARGET_COLUMNS[colLetter] || colLetter;
 
       if (!accessToken) {
         alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
@@ -316,18 +314,17 @@
       statusEl.className = 'status info';
       statusEl.textContent = `총 ${files.length}개 파일에서 D3 값을 읽는 중...`;
 
-      // 1) 모든 파일의 D3 값 읽기
+      // 1) 파일마다 D3 읽기
       const values = [];
       let successCount = 0;
       let emptyCount = 0;
       let failCount = 0;
+
       for (const file of files) {
         try {
           const v = await readD3FromFile(file);
-          if (v === '') {
-            emptyCount++;
-          }
-          values.push([v]); // 한 행에 한 값 (단일 열)
+          if (v === '') emptyCount++;
+          values.push([v]); // 해당 열의 한 셀
           successCount++;
         } catch (err) {
           console.error(err);
@@ -341,13 +338,37 @@
         return;
       }
 
-      // 2) Google Sheets API로 append
-      const range = `${SHEET_NAME}!${colLetter}2:${colLetter}`;
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
-
       try {
-        const res = await fetch(url, {
-          method: 'POST',
+        // 2) 현재 그 열에 이미 몇 행까지 채워져 있는지 확인
+        const colRange = `${SHEET_NAME}!${physicalCol}2:${physicalCol}`;
+        const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(colRange)}`;
+
+        const resGet = await fetch(getUrl, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+
+        let existingCount = 0;
+        if (resGet.ok) {
+          const data = await resGet.json();
+          existingCount = (data.values || []).length;
+        } else if (resGet.status !== 404) {
+          // 404면 값이 없는 컬럼으로 취급
+          const text = await resGet.text();
+          console.warn('col get error:', text);
+        }
+
+        // C2부터 이미 existingCount개가 채워져 있으므로
+        // 다음 값은 2 + existingCount 행부터 들어간다고 보면 됨
+        const startRow = 2 + existingCount;
+        const endRow = startRow + values.length - 1;
+        const updateRange = `${SHEET_NAME}!${physicalCol}${startRow}:${physicalCol}${endRow}`;
+
+        const putUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(updateRange)}?valueInputOption=RAW`;
+
+        // 3) 해당 열 셀에만 값 업데이트 (행/다른 열은 손대지 않음)
+        const resUpdate = await fetch(putUrl, {
+          method: 'PUT',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json; charset=utf-8',
@@ -355,16 +376,16 @@
           body: JSON.stringify({ values }),
         });
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error('Sheets API 오류: ' + text);
+        if (!resUpdate.ok) {
+          const text = await resUpdate.text();
+          throw new Error('Sheets API update 오류: ' + text);
         }
 
         statusEl.className = 'status ok';
         statusEl.textContent =
           `${colLetter}열 업로드 완료 · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
 
-        // 업로드 끝나면 해당 열의 선택 파일 목록 초기화
+        // 업로드 끝나면 해당 열 선택 파일 목록 초기화
         selectedFiles[colLetter] = [];
       } catch (err) {
         console.error(err);

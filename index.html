@@ -2,123 +2,71 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>D3 → 헤더(강의명/강좌명) 열 업로드 도구</title>
+  <title>엑셀 헤더 열(강의명/강좌명) 3행 → C/H/M/R 업로드</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Google Identity Services (OAuth 토큰용) -->
+  <!-- Google Identity Services (OAuth) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- XLSX 파서 (브라우저에서 .xlsx 읽기용) -->
+  <!-- XLSX 파서 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
-    :root {
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --border: #e5e7eb;
-      --accent: #2563eb;
-      --accent-soft: #dbeafe;
-      --danger: #ef4444;
-      --ok: #22c55e;
+    :root{
+      --bg:#f8fafc; --card:#ffffff; --border:#e5e7eb;
+      --accent:#2563eb; --accent-soft:#dbeafe;
+      --danger:#ef4444; --ok:#22c55e;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background: var(--bg);
-      color: #0f172a;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--bg);
+      color:#0f172a;
     }
-    .app {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 16px;
+    .app{max-width:960px;margin:0 auto;padding:16px}
+    header{
+      display:flex;flex-wrap:wrap;
+      align-items:center;justify-content:space-between;
+      gap:8px;margin-bottom:16px;
     }
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 16px;
+    header h1{font-size:1.25rem;margin:0}
+    .sub{font-size:.85rem;color:#64748b}
+    button{
+      cursor:pointer;border-radius:999px;border:1px solid transparent;
+      padding:8px 16px;font-size:.9rem;font-weight:500;
+      background:var(--accent);color:#fff;
+      transition:background .15s ease,transform .05s ease;
     }
-    header h1 {
-      font-size: 1.25rem;
-      margin: 0;
+    button:disabled{opacity:.5;cursor:not-allowed}
+    button:hover:not(:disabled){background:#1d4ed8;transform:translateY(-1px);}
+    .panel{
+      background:var(--card);border-radius:12px;
+      border:1px solid var(--border);
+      padding:16px 16px 12px;margin-bottom:12px;
     }
-    .sub {
-      font-size: 0.85rem;
-      color: #64748b;
+    .panel h2{font-size:1rem;margin:0 0 4px}
+    .panel small{font-size:.8rem;color:#64748b}
+    .row{
+      display:flex;flex-wrap:wrap;gap:8px;
+      margin-top:8px;align-items:center;
     }
-    button {
-      cursor: pointer;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      padding: 8px 16px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      background: var(--accent);
-      color: white;
-      transition: background 0.15s ease, transform 0.05s ease;
+    input[type="file"]{font-size:.85rem}
+    .status{
+      font-size:.8rem;margin-top:6px;min-height:1.1em;
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .status.ok{color:var(--ok)}
+    .status.err{color:var(--danger)}
+    .status.info{color:#64748b}
+    .auth-status{font-size:.85rem}
+    .auth-status span{font-weight:600}
+    .pill{
+      display:inline-flex;padding:4px 8px;
+      border-radius:999px;font-size:.78rem;
+      background:#fee2e2;color:#b91c1c;margin-top:4px;
     }
-    button:hover:not(:disabled) {
-      background: #1d4ed8;
-      transform: translateY(-1px);
-    }
-    .panel {
-      background: var(--card);
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      padding: 16px 16px 12px;
-      margin-bottom: 12px;
-    }
-    .panel h2 {
-      font-size: 1rem;
-      margin: 0 0 4px;
-    }
-    .panel small {
-      font-size: 0.8rem;
-      color: #64748b;
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-      align-items: center;
-    }
-    input[type="file"] {
-      font-size: 0.85rem;
-    }
-    .status {
-      font-size: 0.8rem;
-      margin-top: 6px;
-      min-height: 1.1em;
-    }
-    .status.ok { color: var(--ok); }
-    .status.err { color: var(--danger); }
-    .status.info { color: #64748b; }
-    .auth-status {
-      font-size: 0.85rem;
-    }
-    .auth-status span {
-      font-weight: 600;
-    }
-    .pill {
-      display: inline-flex;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      background: #fee2e2;
-      color: #b91c1c;
-      margin-top: 4px;
-    }
-    @media (max-width: 600px) {
-      header { align-items: flex-start; }
-      .row { flex-direction: column; align-items: flex-start; }
+    @media(max-width:600px){
+      header{align-items:flex-start}
+      .row{flex-direction:column;align-items:flex-start}
     }
   </style>
 </head>
@@ -126,12 +74,12 @@
   <div class="app">
     <header>
       <div>
-        <h1>.xlsx D3 → 헤더(강의명/강좌명) 열 업로드</h1>
+        <h1>엑셀 헤더(강의명/강좌명) 3행 → C/H/M/R 업로드</h1>
         <div class="sub">
-          각 엑셀 파일의 <strong>D3</strong> 값을 읽어서,<br/>
-          입력 시트의 1행에서 <strong>“강의명” 또는 “강좌명”</strong> 이라고 적힌 헤더 열을 찾아<br/>
-          그 열의 <strong>2행부터</strong> 아래로 차례대로 채웁니다.<br/>
-          👉 다른 열/행은 전혀 건드리지 않습니다.
+          업로드한 .xlsx의 <strong>첫 번째 시트</strong>에서<br/>
+          1행 헤더 중 <strong>"강의명" 또는 "강좌명"</strong>이 들어있는 열을 찾고,<br/>
+          그 <strong>같은 열의 3행 값</strong>을 읽어서<br/>
+          연결된 구글 시트의 <strong>C / H / M / R 열</strong>(헤더 제외)에 순서대로 채웁니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -143,76 +91,80 @@
     </header>
 
     <div class="panel">
-      <div class="pill">주의: 이 페이지는 https://(도메인)/ 형태로 호스팅되어야 합니다. file:// 로는 OAuth가 안 됩니다.</div>
+      <div class="pill">
+        ⚠ 이 페이지는 <strong>https://</strong>로 호스팅해야 합니다. (file:// 에서는 OAuth 동작 안 함)
+      </div>
     </div>
 
-    <!-- C 구역 -->
+    <!-- C열 업로드 -->
     <section class="panel">
-      <h2>업로드 구역 C</h2>
-      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터) · 여러 파일 누적 가능</small>
+      <h2>C열 업로드</h2>
+      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 C열 (2행부터 순차 입력)</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
-        <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>업로드(C)</button>
+        <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
       </div>
       <div id="status-C" class="status info"></div>
     </section>
 
-    <!-- H 구역 -->
+    <!-- H열 업로드 -->
     <section class="panel">
-      <h2>업로드 구역 H</h2>
-      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
+      <h2>H열 업로드</h2>
+      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 H열</small>
       <div class="row">
         <input type="file" id="file-h" multiple accept=".xlsx" />
-        <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>업로드(H)</button>
+        <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
       </div>
       <div id="status-H" class="status info"></div>
     </section>
 
-    <!-- M 구역 -->
+    <!-- M열 업로드 -->
     <section class="panel">
-      <h2>업로드 구역 M</h2>
-      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
+      <h2>M열 업로드</h2>
+      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 M열</small>
       <div class="row">
         <input type="file" id="file-m" multiple accept=".xlsx" />
-        <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>업로드(M)</button>
+        <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
       </div>
       <div id="status-M" class="status info"></div>
     </section>
 
-    <!-- R 구역 -->
+    <!-- R열 업로드 -->
     <section class="panel">
-      <h2>업로드 구역 R</h2>
-      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
+      <h2>R열 업로드</h2>
+      <small>엑셀 헤더 중 "강의명/강좌명" 열의 3행 값 → 시트 R열</small>
       <div class="row">
         <input type="file" id="file-r" multiple accept=".xlsx" />
-        <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>업로드(R)</button>
+        <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
       </div>
       <div id="status-R" class="status info"></div>
     </section>
   </div>
 
   <script>
-    // === 1. 기본 설정 ==========================================
+    // ============ 1. 설정값 ============
+
     const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
     const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
-    const SHEET_NAME = '시트1';                                          // TODO: 시트 탭 이름
+    const SHEET_NAME = '시트1';                                          // TODO
 
-    /**
-     * 각 업로드 구역(C/H/M/R)이 어떤 헤더명을 가진 열을 쓸지 정의
-     * - 기본은 모두 "강의명" / "강좌명" 열을 사용
-     *   필요하면 각 키별로 다른 헤더명 배열로 바꿔도 됨.
-     */
-    const COLUMN_HEADERS = {
-      C: ['강의명', '강좌명'],
-      H: ['강의명', '강좌명'],
-      M: ['강의명', '강좌명'],
-      R: ['강의명', '강좌명'],
+    // 업로드 구역 키(C/H/M/R) → 실제 시트 열 문자
+    const TARGET_COLUMNS = {
+      C: 'C',
+      H: 'H',
+      M: 'M',
+      R: 'R',
     };
+
+    // 엑셀 헤더에서 찾을 후보 문자열들
+    const HEADER_CANDIDATES = ['강의명', '강좌명'];
+
+    // ===================================
 
     let tokenClient = null;
     let accessToken = null;
 
-    // 열별로 선택된 파일 누적 저장용
+    // 열별로 선택된 파일 누적
     const selectedFiles = { C: [], H: [], M: [], R: [] };
 
     function setAuthUI(authed) {
@@ -231,39 +183,32 @@
       }
     }
 
-    function initTokenClientIfNeeded() {
-      try {
-        if (tokenClient) return;
-        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-          console.warn('Google OAuth 초기화 대기 중 (google 객체 없음)');
-          return;
-        }
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/spreadsheets',
-          callback: (tokenResponse) => {
-            accessToken = tokenResponse.access_token;
-            setAuthUI(true);
-          },
-        });
-        console.log('TokenClient 초기화 완료');
-      } catch (e) {
-        console.error('initTokenClientIfNeeded 에러', e);
-      }
-    }
-
     window.addEventListener('load', () => {
+      // OAuth 토큰 클라이언트 초기화
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          setAuthUI(true);
+        },
+      });
+
+      document.getElementById('auth-btn').addEventListener('click', () => {
+        tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+      });
+
       // 파일 선택 시 열별 파일 누적
-      ['C','H','M','R'].forEach(col => {
-        const lower = col.toLowerCase();
+      ['C','H','M','R'].forEach(colKey => {
+        const lower = colKey.toLowerCase();
         const input = document.getElementById('file-' + lower);
-        const statusEl = document.getElementById('status-' + col);
+        const statusEl = document.getElementById('status-' + colKey);
 
         input.addEventListener('change', (e) => {
           const files = Array.from(e.target.files || []);
           if (!files.length) return;
 
-          const store = selectedFiles[col];
+          const store = selectedFiles[colKey];
 
           files.forEach(f => {
             const exists = store.some(
@@ -276,26 +221,22 @@
           statusEl.textContent =
             `현재 선택된 파일 ${store.length}개: ` + store.map(f => f.name).join(', ');
 
-          input.value = ''; // 같은 파일 다시 선택 가능하게 초기화
+          // 같은 파일 다시 선택 가능하게 초기화
+          input.value = '';
         });
-      });
-
-      // 로그인 버튼
-      const authBtn = document.getElementById('auth-btn');
-      authBtn.addEventListener('click', () => {
-        initTokenClientIfNeeded();
-        if (!tokenClient) {
-          alert('Google 로그인 초기화 중입니다. 잠시 후 다시 시도해주세요.');
-          return;
-        }
-        tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
       });
 
       setAuthUI(false);
     });
 
-    // === 2. .xlsx에서 D3 읽기 =========================================
-    function readD3FromFile(file) {
+    // ============ 2. 엑셀에서 값 읽기 (헤더 인식) ============
+
+    /**
+     * 엑셀 첫 시트에서:
+     *  - 1행 헤더에서 HEADER_CANDIDATES 중 하나가 포함된 열을 찾고
+     *  - 그 열의 3행 값을 반환
+     */
+    function readHeaderRow3FromFile(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('파일 읽기 실패: ' + file.name));
@@ -305,8 +246,39 @@
             const wb = XLSX.read(data, { type: 'array' });
             const firstSheetName = wb.SheetNames[0];
             const sheet = wb.Sheets[firstSheetName];
-            const cell = sheet['D3'];
-            const value = cell ? String(cell.v) : '';
+
+            // 2D 배열로 변환 (행/열 인덱스 기반 접근)
+            const rows = XLSX.utils.sheet_to_json(sheet, {
+              header: 1,
+              defval: '',
+              blankrows: true
+            });
+
+            if (rows.length < 3) {
+              // 3행이 없음
+              resolve('');
+              return;
+            }
+
+            const headerRow = rows[0];  // 1행
+            const dataRow   = rows[2];  // 3행 (0-based index 2)
+
+            let targetIndex = -1;
+            for (let j = 0; j < headerRow.length; j++) {
+              const headerText = String(headerRow[j] || '');
+              if (HEADER_CANDIDATES.some(h => headerText.includes(h))) {
+                targetIndex = j;
+                break;
+              }
+            }
+
+            if (targetIndex === -1) {
+              // 헤더를 못 찾으면 빈 값으로 처리
+              resolve('');
+              return;
+            }
+
+            const value = dataRow[targetIndex] !== undefined ? String(dataRow[targetIndex]) : '';
             resolve(value);
           } catch (err) {
             reject(new Error('엑셀 파싱 실패: ' + file.name + ' · ' + err.message));
@@ -316,94 +288,37 @@
       });
     }
 
-    // === 3. 헤더명으로 열 찾기 =========================================
+    // ============ 3. 특정 시트 열(C/H/M/R)에 값 쓰기 ============
 
-    // 0-based index → A/B/C... 로 변환
-    function indexToColumnLetter(index) {
-      let result = '';
-      let n = index;
-      while (n >= 0) {
-        result = String.fromCharCode((n % 26) + 65) + result;
-        n = Math.floor(n / 26) - 1;
-      }
-      return result;
-    }
-
-    /**
-     * headerNames 중 하나와 일치하는 헤더를 1행에서 찾고,
-     * 그 열의 "열 문자" (예: C, H, AA...)를 리턴
-     */
-    async function findColumnByHeader(headerNames) {
-      if (!headerNames || headerNames.length === 0) {
-        throw new Error('찾을 헤더명이 설정되어 있지 않습니다.');
-      }
-
-      const range = `${SHEET_NAME}!1:1`;
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
-
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error('헤더 행 읽기 오류: ' + text);
-      }
-
-      const data = await res.json();
-      const headerRow = (data.values && data.values[0]) || [];
-
-      const trimmedTargets = headerNames.map(h => String(h).trim());
-
-      let foundIndex = -1;
-      for (let i = 0; i < headerRow.length; i++) {
-        const cellText = String(headerRow[i]).trim();
-        if (trimmedTargets.includes(cellText)) {
-          foundIndex = i;
-          break;
-        }
-      }
-
-      if (foundIndex === -1) {
-        throw new Error(
-          `1행에서 지정한 헤더(${headerNames.join(' / ')})를 찾을 수 없습니다.`
-        );
-      }
-
-      return indexToColumnLetter(foundIndex); // 예: 2 → C
-    }
-
-    // === 4. 업로드 (행 안 밀리고, 헤더 열만 씀) =======================
     async function uploadColumn(colKey) {
       const statusEl = document.getElementById('status-' + colKey);
       const files = selectedFiles[colKey] || [];
-      const headerCandidates = COLUMN_HEADERS[colKey] || [];
+      const physicalCol = TARGET_COLUMNS[colKey];
 
       if (!accessToken) {
         alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
         return;
       }
-
+      if (!physicalCol) {
+        alert(colKey + '열 매핑이 잘못되었습니다. 코드의 TARGET_COLUMNS를 확인해주세요.');
+        return;
+      }
       if (!files.length) {
-        alert(colKey + ' 구역에 넣을 .xlsx 파일을 선택해주세요.');
+        alert(colKey + '열에 넣을 .xlsx 파일을 선택해주세요.');
         return;
       }
 
       statusEl.className = 'status info';
-      statusEl.textContent = `총 ${files.length}개 파일에서 D3 값을 읽는 중...`;
+      statusEl.textContent = `총 ${files.length}개 파일에서 헤더열(강의명/강좌명)의 3행 값을 읽는 중...`;
 
-      // 1) 파일마다 D3 읽기
       const values = [];
-      let successCount = 0;
-      let emptyCount = 0;
-      let failCount = 0;
+      let successCount = 0, emptyCount = 0, failCount = 0;
 
       for (const file of files) {
         try {
-          const v = await readD3FromFile(file);
+          const v = await readHeaderRow3FromFile(file);
           if (v === '') emptyCount++;
-          values.push([v]);
+          values.push([v]);  // 한 행에 한 값
           successCount++;
         } catch (err) {
           console.error(err);
@@ -418,10 +333,7 @@
       }
 
       try {
-        // 2) 헤더명으로 실제 열 문자 찾기
-        const physicalCol = await findColumnByHeader(headerCandidates);
-
-        // 3) 그 열에서 이미 채워진 행 수 확인 (2행부터)
+        // 이 열에서 "헤더 제외(2행부터)" 이미 채워진 행 수 확인
         const colRange = `${SHEET_NAME}!${physicalCol}2:${physicalCol}`;
         const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(colRange)}`;
 
@@ -436,13 +348,13 @@
           existingCount = (data.values || []).length;
         } else if (resGet.status !== 404) {
           const text = await resGet.text();
-          console.warn('col get error:', text);
+          console.warn('열 값 읽기 오류:', text);
         }
 
+        // 이미 existingCount개 있으니, 2 + existingCount 행부터 새로 채움
         const startRow = 2 + existingCount;
-        const endRow = startRow + values.length - 1;
+        const endRow   = startRow + values.length - 1;
         const updateRange = `${SHEET_NAME}!${physicalCol}${startRow}:${physicalCol}${endRow}`;
-
         const putUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(updateRange)}?valueInputOption=RAW`;
 
         const resUpdate = await fetch(putUrl, {
@@ -461,10 +373,10 @@
 
         statusEl.className = 'status ok';
         statusEl.textContent =
-          `${colKey} 업로드 완료 · (헤더: ${headerCandidates.join('/')})`
-          + ` · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
+          `${colKey}열 업로드 완료 · 성공 ${successCount}개, `
+          + `헤더열 3행 공백 ${emptyCount}개, 실패 ${failCount}개`;
 
-        selectedFiles[colKey] = []; // 선택 파일 초기화
+        selectedFiles[colKey] = []; // 해당 열 파일 목록 초기화
       } catch (err) {
         console.error(err);
         statusEl.className = 'status err';

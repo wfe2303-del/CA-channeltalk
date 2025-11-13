@@ -45,12 +45,9 @@
       font-size: 1.25rem;
       margin: 0;
     }
-    .badge {
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      background: var(--accent-soft);
-      color: var(--accent);
+    .sub {
+      font-size: 0.85rem;
+      color: #64748b;
     }
     button {
       cursor: pointer;
@@ -70,10 +67,6 @@
     button:hover:not(:disabled) {
       background: #1d4ed8;
       transform: translateY(-1px);
-    }
-    .sub {
-      font-size: 0.85rem;
-      color: #64748b;
     }
     .panel {
       background: var(--card);
@@ -141,7 +134,8 @@
         <h1>.xlsx D3 → C/H/M/R 열 업로드</h1>
         <div class="sub">
           각 엑셀 파일의 <strong>D3</strong> 셀 값을 읽어서, 지정한 열(C/H/M/R)의
-          <strong>2행부터</strong> 아래로 차례대로 추가합니다.
+          <strong>2행부터</strong> 아래로 차례대로 추가합니다.<br/>
+          👉 같은 열에 파일을 여러 번 골라도 누적됩니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -205,11 +199,19 @@
     // === 1. 설정값 (여기만 본인 걸로 교체) ==========================
     const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
     const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
-    const SHEET_NAME = '시트1'; // TODO: 값 넣을 시트 이름 (헤더는 1행, 데이터는 2행부터)
+    const SHEET_NAME = '시트1';                                           // TODO: 값 넣을 시트 이름
 
     // ===============================================================
     let tokenClient;
     let accessToken = null;
+
+    // 열별로 선택된 파일 누적 저장용
+    const selectedFiles = {
+      C: [],
+      H: [],
+      M: [],
+      R: [],
+    };
 
     function setAuthUI(authed) {
       const authBtn = document.getElementById('auth-btn');
@@ -242,6 +244,35 @@
         tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
       });
 
+      // 파일 선택 시, 열별로 파일 누적 저장
+      ['C','H','M','R'].forEach(col => {
+        const lower = col.toLowerCase();
+        const input = document.getElementById('file-' + lower);
+        const statusEl = document.getElementById('status-' + col);
+
+        input.addEventListener('change', (e) => {
+          const files = Array.from(e.target.files || []);
+          if (!files.length) return;
+
+          const store = selectedFiles[col];
+
+          // 중복(이름+사이즈+수정시각) 파일은 한 번만
+          files.forEach(f => {
+            const exists = store.some(
+              x => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified
+            );
+            if (!exists) store.push(f);
+          });
+
+          statusEl.className = 'status info';
+          statusEl.textContent =
+            `현재 선택된 파일 ${store.length}개: ` + store.map(f => f.name).join(', ');
+
+          // 같은 파일을 다시 선택할 수 있게 input 비워주기
+          input.value = '';
+        });
+      });
+
       setAuthUI(false);
     });
 
@@ -269,16 +300,14 @@
 
     // === 3. 특정 열(C/H/M/R)에 업로드 ================================
     async function uploadColumn(colLetter) {
-      const lower = colLetter.toLowerCase();
-      const fileInput = document.getElementById('file-' + lower);
       const statusEl = document.getElementById('status-' + colLetter);
+      const files = selectedFiles[colLetter] || [];
 
       if (!accessToken) {
         alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
         return;
       }
 
-      const files = Array.from(fileInput.files || []);
       if (!files.length) {
         alert(colLetter + '열에 넣을 .xlsx 파일을 선택해주세요.');
         return;
@@ -334,8 +363,9 @@
         statusEl.className = 'status ok';
         statusEl.textContent =
           `${colLetter}열 업로드 완료 · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
-        // 완료 후 파일 선택 초기화 (원하면 유지해도 됨)
-        fileInput.value = '';
+
+        // 업로드 끝나면 해당 열의 선택 파일 목록 초기화
+        selectedFiles[colLetter] = [];
       } catch (err) {
         console.error(err);
         statusEl.className = 'status err';

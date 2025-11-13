@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>D3 → C/H/M/R 열 업로드 도구</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Google Identity Services (OAuth 토큰용) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- XLSX 파서 (브라우저에서 .xlsx 읽기용) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --danger: #ef4444;
+      --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: #0f172a;
+    }
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    button {
+      cursor: pointer;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: var(--accent);
+      color: white;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    .sub {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    .panel {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 16px 16px 12px;
+      margin-bottom: 12px;
+    }
+    .panel h2 {
+      font-size: 1rem;
+      margin: 0 0 4px;
+    }
+    .panel small {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    input[type="file"] {
+      font-size: 0.85rem;
+    }
+    .status {
+      font-size: 0.8rem;
+      margin-top: 6px;
+      min-height: 1.1em;
+    }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .status.info { color: #64748b; }
+    .auth-status {
+      font-size: 0.85rem;
+    }
+    .auth-status span {
+      font-weight: 600;
+    }
+    .pill {
+      display: inline-flex;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      background: #fee2e2;
+      color: #b91c1c;
+      margin-top: 4px;
+    }
+    @media (max-width: 600px) {
+      header {
+        align-items: flex-start;
+      }
+      .row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>.xlsx D3 → C/H/M/R 열 업로드</h1>
+        <div class="sub">
+          각 엑셀 파일의 <strong>D3</strong> 셀 값을 읽어서, 지정한 열(C/H/M/R)의
+          <strong>2행부터</strong> 아래로 차례대로 추가합니다.
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <button id="auth-btn" type="button">Google 로그인하기</button>
+        <div id="auth-status" class="auth-status">
+          <span>로그인 필요</span> · 스프레드시트 편집 권한 허용
+        </div>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="pill">주의: 이 페이지는 https://(도메인)/ 형태로 호스팅되어야 합니다. file:// 로는 OAuth가 안 됩니다.</div>
+    </div>
+
+    <!-- C 열 업로드 -->
+    <section class="panel">
+      <h2>C열에 넣을 파일(.xlsx)</h2>
+      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 C열 (헤더 1행 제외, 2행부터 추가)</small>
+      <div class="row">
+        <input type="file" id="file-c" multiple accept=".xlsx" />
+        <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
+      </div>
+      <div id="status-C" class="status info"></div>
+    </section>
+
+    <!-- H 열 업로드 -->
+    <section class="panel">
+      <h2>H열에 넣을 파일(.xlsx)</h2>
+      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 H열</small>
+      <div class="row">
+        <input type="file" id="file-h" multiple accept=".xlsx" />
+        <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
+      </div>
+      <div id="status-H" class="status info"></div>
+    </section>
+
+    <!-- M 열 업로드 -->
+    <section class="panel">
+      <h2>M열에 넣을 파일(.xlsx)</h2>
+      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 M열</small>
+      <div class="row">
+        <input type="file" id="file-m" multiple accept=".xlsx" />
+        <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
+      </div>
+      <div id="status-M" class="status info"></div>
+    </section>
+
+    <!-- R 열 업로드 -->
+    <section class="panel">
+      <h2>R열에 넣을 파일(.xlsx)</h2>
+      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 R열</small>
+      <div class="row">
+        <input type="file" id="file-r" multiple accept=".xlsx" />
+        <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
+      </div>
+      <div id="status-R" class="status info"></div>
+    </section>
+  </div>
+
+  <script>
+    // === 1. 설정값 (여기만 본인 걸로 교체) ==========================
+    const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
+    const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
+    const SHEET_NAME = '시트1'; // TODO: 값 넣을 시트 이름 (헤더는 1행, 데이터는 2행부터)
+
+    // ===============================================================
+    let tokenClient;
+    let accessToken = null;
+
+    function setAuthUI(authed) {
+      const authBtn = document.getElementById('auth-btn');
+      const authStatus = document.getElementById('auth-status');
+      const buttons = ['btn-c','btn-h','btn-m','btn-r'].map(id => document.getElementById(id));
+
+      if (authed) {
+        authBtn.textContent = '다시 권한 확인하기';
+        authStatus.innerHTML = '<span>로그인 완료</span> · 업로드 가능';
+        buttons.forEach(b => b.disabled = false);
+      } else {
+        authBtn.textContent = 'Google 로그인하기';
+        authStatus.innerHTML = '<span>로그인 필요</span> · 스프레드시트 편집 권한 허용';
+        buttons.forEach(b => b.disabled = true);
+      }
+    }
+
+    window.addEventListener('load', () => {
+      // Google OAuth 토큰 클라이언트 초기화
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          setAuthUI(true);
+        },
+      });
+
+      document.getElementById('auth-btn').addEventListener('click', () => {
+        tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+      });
+
+      setAuthUI(false);
+    });
+
+    // === 2. .xlsx에서 D3 읽기 =========================================
+    function readD3FromFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('파일 읽기 실패: ' + file.name));
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const firstSheetName = wb.SheetNames[0];
+            const sheet = wb.Sheets[firstSheetName];
+            const cell = sheet['D3'];
+            const value = cell ? String(cell.v) : '';
+            resolve(value);
+          } catch (err) {
+            reject(new Error('엑셀 파싱 실패: ' + file.name + ' · ' + err.message));
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // === 3. 특정 열(C/H/M/R)에 업로드 ================================
+    async function uploadColumn(colLetter) {
+      const lower = colLetter.toLowerCase();
+      const fileInput = document.getElementById('file-' + lower);
+      const statusEl = document.getElementById('status-' + colLetter);
+
+      if (!accessToken) {
+        alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
+        return;
+      }
+
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) {
+        alert(colLetter + '열에 넣을 .xlsx 파일을 선택해주세요.');
+        return;
+      }
+
+      statusEl.className = 'status info';
+      statusEl.textContent = `총 ${files.length}개 파일에서 D3 값을 읽는 중...`;
+
+      // 1) 모든 파일의 D3 값 읽기
+      const values = [];
+      let successCount = 0;
+      let emptyCount = 0;
+      let failCount = 0;
+      for (const file of files) {
+        try {
+          const v = await readD3FromFile(file);
+          if (v === '') {
+            emptyCount++;
+          }
+          values.push([v]); // 한 행에 한 값 (단일 열)
+          successCount++;
+        } catch (err) {
+          console.error(err);
+          failCount++;
+        }
+      }
+
+      if (!values.length) {
+        statusEl.className = 'status err';
+        statusEl.textContent = '읽어 온 값이 없습니다.';
+        return;
+      }
+
+      // 2) Google Sheets API로 append
+      const range = `${SHEET_NAME}!${colLetter}2:${colLetter}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+          body: JSON.stringify({ values }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error('Sheets API 오류: ' + text);
+        }
+
+        statusEl.className = 'status ok';
+        statusEl.textContent =
+          `${colLetter}열 업로드 완료 · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
+        // 완료 후 파일 선택 초기화 (원하면 유지해도 됨)
+        fileInput.value = '';
+      } catch (err) {
+        console.error(err);
+        statusEl.className = 'status err';
+        statusEl.textContent = '업로드 중 오류: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>

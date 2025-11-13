@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>D3 → C/H/M/R 열 업로드 도구</title>
+  <title>D3 → 헤더(강의명/강좌명) 열 업로드 도구</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Google Identity Services (OAuth 토큰용) -->
@@ -126,11 +126,12 @@
   <div class="app">
     <header>
       <div>
-        <h1>.xlsx D3 → C/H/M/R 열 업로드</h1>
+        <h1>.xlsx D3 → 헤더(강의명/강좌명) 열 업로드</h1>
         <div class="sub">
-          각 엑셀 파일의 <strong>D3</strong> 셀 값을 읽어서, 지정한 열(C/H/M/R)의
-          <strong>2행부터</strong> 아래로 차례대로 추가합니다.<br/>
-          👉 다른 열/행은 건드리지 않고, 해당 열 셀만 채웁니다.
+          각 엑셀 파일의 <strong>D3</strong> 값을 읽어서,<br/>
+          입력 시트의 1행에서 <strong>“강의명” 또는 “강좌명”</strong> 이라고 적힌 헤더 열을 찾아<br/>
+          그 열의 <strong>2행부터</strong> 아래로 차례대로 채웁니다.<br/>
+          👉 다른 열/행은 전혀 건드리지 않습니다.
         </div>
       </div>
       <div style="text-align:right;">
@@ -145,67 +146,70 @@
       <div class="pill">주의: 이 페이지는 https://(도메인)/ 형태로 호스팅되어야 합니다. file:// 로는 OAuth가 안 됩니다.</div>
     </div>
 
-    <!-- C 열 업로드 -->
+    <!-- C 구역 -->
     <section class="panel">
-      <h2>C열에 넣을 파일(.xlsx)</h2>
-      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 C열 (헤더 1행 제외, 2행부터)</small>
+      <h2>업로드 구역 C</h2>
+      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터) · 여러 파일 누적 가능</small>
       <div class="row">
         <input type="file" id="file-c" multiple accept=".xlsx" />
-        <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>C열 업로드</button>
+        <button type="button" id="btn-c" onclick="uploadColumn('C')" disabled>업로드(C)</button>
       </div>
       <div id="status-C" class="status info"></div>
     </section>
 
-    <!-- H 열 업로드 -->
+    <!-- H 구역 -->
     <section class="panel">
-      <h2>H열에 넣을 파일(.xlsx)</h2>
-      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 H열</small>
+      <h2>업로드 구역 H</h2>
+      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
       <div class="row">
         <input type="file" id="file-h" multiple accept=".xlsx" />
-        <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>H열 업로드</button>
+        <button type="button" id="btn-h" onclick="uploadColumn('H')" disabled>업로드(H)</button>
       </div>
       <div id="status-H" class="status info"></div>
     </section>
 
-    <!-- M 열 업로드 -->
+    <!-- M 구역 -->
     <section class="panel">
-      <h2>M열에 넣을 파일(.xlsx)</h2>
-      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 M열</small>
+      <h2>업로드 구역 M</h2>
+      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
       <div class="row">
         <input type="file" id="file-m" multiple accept=".xlsx" />
-        <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>M열 업로드</button>
+        <button type="button" id="btn-m" onclick="uploadColumn('M')" disabled>업로드(M)</button>
       </div>
       <div id="status-M" class="status info"></div>
     </section>
 
-    <!-- R 열 업로드 -->
+    <!-- R 구역 -->
     <section class="panel">
-      <h2>R열에 넣을 파일(.xlsx)</h2>
-      <small>첫 번째 시트의 D3 셀 → 연결된 시트의 R열</small>
+      <h2>업로드 구역 R</h2>
+      <small>D3 → “강의명/강좌명” 헤더 열 (2행부터)</small>
       <div class="row">
         <input type="file" id="file-r" multiple accept=".xlsx" />
-        <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>R열 업로드</button>
+        <button type="button" id="btn-r" onclick="uploadColumn('R')" disabled>업로드(R)</button>
       </div>
       <div id="status-R" class="status info"></div>
     </section>
   </div>
 
   <script>
-    // === 1. 설정값 (여기만 본인 걸로 교체) ==========================
+    // === 1. 기본 설정 ==========================================
     const CLIENT_ID = '18228268359-iifm4ck3j9kqj74eh1p90tco1k2mbpi0.apps.googleusercontent.com'; // TODO: 본인 OAuth 클라이언트 ID
     const SPREADSHEET_ID = '1APS4O3FRFKVf7nAxkjuVV1JhoA5Rm3mW9pyz6Vkq8NQ'; // TODO: 값 넣을 스프레드시트 ID
-    const SHEET_NAME = '시트1';                                          // TODO
+    const SHEET_NAME = '시트1';                                          // TODO: 시트 탭 이름
 
-    // 버튼(C/H/M/R) → 실제 시트 열 문자 매핑
-    const TARGET_COLUMNS = {
-      C: 'C',
-      H: 'H',
-      M: 'M',
-      R: 'R',
+    /**
+     * 각 업로드 구역(C/H/M/R)이 어떤 헤더명을 가진 열을 쓸지 정의
+     * - 기본은 모두 "강의명" / "강좌명" 열을 사용
+     *   필요하면 각 키별로 다른 헤더명 배열로 바꿔도 됨.
+     */
+    const COLUMN_HEADERS = {
+      C: ['강의명', '강좌명'],
+      H: ['강의명', '강좌명'],
+      M: ['강의명', '강좌명'],
+      R: ['강의명', '강좌명'],
     };
 
-    // ===============================================================
-    let tokenClient;
+    let tokenClient = null;
     let accessToken = null;
 
     // 열별로 선택된 파일 누적 저장용
@@ -227,21 +231,28 @@
       }
     }
 
+    function initTokenClientIfNeeded() {
+      try {
+        if (tokenClient) return;
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+          console.warn('Google OAuth 초기화 대기 중 (google 객체 없음)');
+          return;
+        }
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: 'https://www.googleapis.com/auth/spreadsheets',
+          callback: (tokenResponse) => {
+            accessToken = tokenResponse.access_token;
+            setAuthUI(true);
+          },
+        });
+        console.log('TokenClient 초기화 완료');
+      } catch (e) {
+        console.error('initTokenClientIfNeeded 에러', e);
+      }
+    }
+
     window.addEventListener('load', () => {
-      // Google OAuth 토큰 클라이언트 초기화
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
-        callback: (tokenResponse) => {
-          accessToken = tokenResponse.access_token;
-          setAuthUI(true);
-        },
-      });
-
-      document.getElementById('auth-btn').addEventListener('click', () => {
-        tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
-      });
-
       // 파일 선택 시 열별 파일 누적
       ['C','H','M','R'].forEach(col => {
         const lower = col.toLowerCase();
@@ -265,9 +276,19 @@
           statusEl.textContent =
             `현재 선택된 파일 ${store.length}개: ` + store.map(f => f.name).join(', ');
 
-          // 같은 파일 다시 선택 가능하게 초기화
-          input.value = '';
+          input.value = ''; // 같은 파일 다시 선택 가능하게 초기화
         });
+      });
+
+      // 로그인 버튼
+      const authBtn = document.getElementById('auth-btn');
+      authBtn.addEventListener('click', () => {
+        initTokenClientIfNeeded();
+        if (!tokenClient) {
+          alert('Google 로그인 초기화 중입니다. 잠시 후 다시 시도해주세요.');
+          return;
+        }
+        tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
       });
 
       setAuthUI(false);
@@ -295,11 +316,69 @@
       });
     }
 
-    // === 3. 특정 열(C/H/M/R)에 업로드 (행 밀림 없음) ==================
-    async function uploadColumn(colLetter) {
-      const statusEl = document.getElementById('status-' + colLetter);
-      const files = selectedFiles[colLetter] || [];
-      const physicalCol = TARGET_COLUMNS[colLetter] || colLetter;
+    // === 3. 헤더명으로 열 찾기 =========================================
+
+    // 0-based index → A/B/C... 로 변환
+    function indexToColumnLetter(index) {
+      let result = '';
+      let n = index;
+      while (n >= 0) {
+        result = String.fromCharCode((n % 26) + 65) + result;
+        n = Math.floor(n / 26) - 1;
+      }
+      return result;
+    }
+
+    /**
+     * headerNames 중 하나와 일치하는 헤더를 1행에서 찾고,
+     * 그 열의 "열 문자" (예: C, H, AA...)를 리턴
+     */
+    async function findColumnByHeader(headerNames) {
+      if (!headerNames || headerNames.length === 0) {
+        throw new Error('찾을 헤더명이 설정되어 있지 않습니다.');
+      }
+
+      const range = `${SHEET_NAME}!1:1`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error('헤더 행 읽기 오류: ' + text);
+      }
+
+      const data = await res.json();
+      const headerRow = (data.values && data.values[0]) || [];
+
+      const trimmedTargets = headerNames.map(h => String(h).trim());
+
+      let foundIndex = -1;
+      for (let i = 0; i < headerRow.length; i++) {
+        const cellText = String(headerRow[i]).trim();
+        if (trimmedTargets.includes(cellText)) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      if (foundIndex === -1) {
+        throw new Error(
+          `1행에서 지정한 헤더(${headerNames.join(' / ')})를 찾을 수 없습니다.`
+        );
+      }
+
+      return indexToColumnLetter(foundIndex); // 예: 2 → C
+    }
+
+    // === 4. 업로드 (행 안 밀리고, 헤더 열만 씀) =======================
+    async function uploadColumn(colKey) {
+      const statusEl = document.getElementById('status-' + colKey);
+      const files = selectedFiles[colKey] || [];
+      const headerCandidates = COLUMN_HEADERS[colKey] || [];
 
       if (!accessToken) {
         alert('먼저 상단의 "Google 로그인하기" 버튼으로 로그인을 해주세요.');
@@ -307,7 +386,7 @@
       }
 
       if (!files.length) {
-        alert(colLetter + '열에 넣을 .xlsx 파일을 선택해주세요.');
+        alert(colKey + ' 구역에 넣을 .xlsx 파일을 선택해주세요.');
         return;
       }
 
@@ -324,7 +403,7 @@
         try {
           const v = await readD3FromFile(file);
           if (v === '') emptyCount++;
-          values.push([v]); // 해당 열의 한 셀
+          values.push([v]);
           successCount++;
         } catch (err) {
           console.error(err);
@@ -339,7 +418,10 @@
       }
 
       try {
-        // 2) 현재 그 열에 이미 몇 행까지 채워져 있는지 확인
+        // 2) 헤더명으로 실제 열 문자 찾기
+        const physicalCol = await findColumnByHeader(headerCandidates);
+
+        // 3) 그 열에서 이미 채워진 행 수 확인 (2행부터)
         const colRange = `${SHEET_NAME}!${physicalCol}2:${physicalCol}`;
         const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(colRange)}`;
 
@@ -353,20 +435,16 @@
           const data = await resGet.json();
           existingCount = (data.values || []).length;
         } else if (resGet.status !== 404) {
-          // 404면 값이 없는 컬럼으로 취급
           const text = await resGet.text();
           console.warn('col get error:', text);
         }
 
-        // C2부터 이미 existingCount개가 채워져 있으므로
-        // 다음 값은 2 + existingCount 행부터 들어간다고 보면 됨
         const startRow = 2 + existingCount;
         const endRow = startRow + values.length - 1;
         const updateRange = `${SHEET_NAME}!${physicalCol}${startRow}:${physicalCol}${endRow}`;
 
         const putUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(updateRange)}?valueInputOption=RAW`;
 
-        // 3) 해당 열 셀에만 값 업데이트 (행/다른 열은 손대지 않음)
         const resUpdate = await fetch(putUrl, {
           method: 'PUT',
           headers: {
@@ -383,10 +461,10 @@
 
         statusEl.className = 'status ok';
         statusEl.textContent =
-          `${colLetter}열 업로드 완료 · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
+          `${colKey} 업로드 완료 · (헤더: ${headerCandidates.join('/')})`
+          + ` · 성공 ${successCount}개, D3 비어있음 ${emptyCount}개, 실패 ${failCount}개`;
 
-        // 업로드 끝나면 해당 열 선택 파일 목록 초기화
-        selectedFiles[colLetter] = [];
+        selectedFiles[colKey] = []; // 선택 파일 초기화
       } catch (err) {
         console.error(err);
         statusEl.className = 'status err';
